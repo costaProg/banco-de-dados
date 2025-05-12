@@ -85,7 +85,7 @@ CREATE TABLE Reserva(
 	DataCheckIn DATE NOT NULL,
 	DataCheckOut DATE NOT NULL,
 	ValorPago DOUBLE(8, 2) 	NOT NULL,
-	Status VARCHAR(10) NOT NULL CHECK(Status IN('Em andamento', 'Concluída', 'Cancelada')),
+	Status VARCHAR(15) NOT NULL CHECK(Status IN('Em andamento', 'Concluída', 'Cancelada')),
 	FkHotel INT(11) NOT NULL,
 	FkQuarto INT(11) NOT NULL,
 	FkHospede INT(11) NOT NULL,
@@ -108,4 +108,6 @@ CREATE TABLE Contrata(
 	FOREIGN KEY(FkReserva) REFERENCES Reserva(ID),
 	FOREIGN KEY(FkServicoAdicional) REFERENCES ServicoAdicional(ID)
 );
+
+
 

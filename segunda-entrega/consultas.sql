@@ -1,120 +1,115 @@
--- 1. Hospedes e seus contatos
-SELECT 
-    Pessoa.PrimeiroNome, 
-    Pessoa.UltimoNome, 
-    PessoaContato.Telefone, 
-    PessoaContato.Email 
-FROM Pessoa 
-JOIN PessoaContato ON PessoaContato.FkPessoa = Pessoa.ID 
-WHERE Pessoa.ID IN (
-    SELECT FkPessoa FROM Hospede
-);
+USE HotelHease;
 
--- 2. Reservas em andamento
+# 1. Hospedes e seus contatos
 SELECT 
-    DataCheckIn, 
-    DataCheckOut 
-FROM Reserva 
+	p.PrimeiroNome, 
+	p.UltimoNome, 
+	pc.Telefone, 
+	pc.Email 
+FROM Pessoa p
+	JOIN PessoaContato pc ON pc.FkPessoa = p.ID 
+WHERE p.ID IN (SELECT FkPessoa FROM Hospede);
+
+# 2. Reservas em andamento
+SELECT 
+	r.DataCheckIn, 
+	r.DataCheckOut 
+FROM Reserva r
 WHERE Status = "Em andamento";
 
--- 3. Quartos disponíveis por categoria em um hotel
+# 3. Quartos disponiveis por categoria em um hotel
 SELECT 
-    Categoria, 
-    COUNT(*) 
-FROM Quarto 
-WHERE Status = "Disponível" 
-  AND FkHotel = -ID do hotel- 
-GROUP BY Categoria;
+	q.Categoria,
+	count(*) 
+FROM Quarto q
+WHERE q.Status = "Disponível" 
+	AND FkHotel = 1
+	GROUP BY Categoria
 
--- 4. Hospedes com reservas a partir de 7 dias atrás
+# 4. Hospedes com reservas a partir de 7 dias atrás
 SELECT 
-    Pessoa.PrimeiroNome, 
-    Pessoa.UltimoNome, 
-    Reserva.ValorPago 
+	p.PrimeiroNome, 
+	p.UltimoNome, 
+	r.ValorPago 
+FROM Pessoa p
+	JOIN Reserva r ON r.FkHospede = p.ID 
+WHERE r.DataCheckIn >= '2025-05-05';
+
+# 5. Pessoas com mais de 3 reservas nos ultimos 12 meses
+SELECT 
+	PrimeiroNome, 
+	UltimoNome 
 FROM Pessoa 
-JOIN Reserva ON Reserva.FkHospede = Pessoa.ID 
-WHERE Reserva.DataCheckIn >= "Data de hoje com 7 dias a menos";
+	JOIN Reserva ON Pessoa.ID = Reserva.FkHospede 
+WHERE Reserva.DataCheckIn >= '2024-05-05' 
+GROUP BY Pessoa.ID HAVING count(Reserva.ID) > 3
 
--- 5. Pessoas com mais de 3 reservas desde o mesmo dia do ano passado
+# 6. Número de reservas por hotel desde o mês passado
 SELECT 
-    PrimeiroNome, 
-    UltimoNome 
-FROM Pessoa 
-JOIN Reserva ON Pessoa.ID = Reserva.ID 
-WHERE Reserva.DataCheckIn >= "Data de hoje no ano passado" 
-GROUP BY Pessoa.ID 
-HAVING COUNT(Reserva.ID) > 3;
-
--- 6. Número de reservas por hotel desde o mês passado
-SELECT 
-    Hotel.Nome, 
-    COUNT(Reserva.ID) 
+	Hotel.ID,
+	Hotel.Nome,
+	count(Reserva.ID) 
 FROM Hotel 
-JOIN Reserva ON Reserva.FkHotel = Hotel.ID 
-WHERE Reserva.DataCheckIn >= "Data de hoje no mês passado" 
-GROUP BY Hotel.ID;
+	JOIN Reserva ON Reserva.FkHotel = Hotel.ID 
+WHERE Reserva.DataCheckIn >= '2025-04-05'
+	GROUP BY Hotel.ID;
 
--- 7. Hotéis com mais de 90% de ocupação
+# 7. Hotéis com mais de 90% de ocupação
 SELECT 
-    Hotel.Nome 
+	Hotel.Nome 
 FROM Hotel 
-JOIN Quarto ON Quarto.FkHotel = Hotel.ID 
+	JOIN Quarto ON Quarto.FkHotel = Hotel.ID 
 GROUP BY Hotel.ID, Hotel.Capacidade 
-HAVING (
-    COUNT(CASE WHEN Quarto.Status = "Ocupado" THEN 1 END) / Hotel.Capacidade
-) > 0.9;
+HAVING (count(CASE WHEN Quarto.Status = "Ocupado" THEN 1 END) / Hotel.Capacidade) > 0.5;
 
--- 8. Serviços adicionais contratados para reservas recentes
+# 8. Serviços adicionais contratados para reservas recentes
 SELECT 
-    ServicoAdicional.* 
-FROM ServicoAdicional 
-JOIN Contrata ON Contrata.FkServicoAdicional = ServicoAdicional.ID 
-WHERE Contrata.FkReserva IN (
-    SELECT Reserva.ID 
-    FROM Reserva 
-    WHERE DataCheckIn >= "2025-05-09"
-);
+	* 
+FROM ServicoAdicional s
+	JOIN Contrata c ON c.FkServicoAdicional = s.ID 
+WHERE c.FkReserva IN (SELECT r.ID FROM Reserva r WHERE DataCheckIn >= '2025-05-08');
 
--- 9. Receita por hotel incluindo serviços adicionais (últimos 6 meses)
-SELECT 
-    Hotel.Nome, 
-    (SUM(Reserva.ValorPago) + SUM(ServicoAdicional.Preco)) 
-FROM Hotel 
-JOIN Reserva ON Reserva.FkHotel = Hotel.ID 
-LEFT JOIN Contrata ON Contrata.FkReserva = Reserva.ID 
-LEFT JOIN ServicoAdicional ON ServicoAdicional.ID = Contrata.FkServicoAdicional 
-WHERE Reserva.DataCheckIn >= "Data dos últimos 6 meses" 
-GROUP BY Hotel.ID;
+# 9. Receita por hotel incluindo serviços adicionais (Ultimos 6 meses)
+SELECT
+    h.Nome,
+    SUM(r.ValorPago) + IFNULL(SUM(s.Preco), 0) AS FaturamentoTotal
+FROM Hotel h
+	JOIN Reserva r ON r.FkHotel = h.ID
+	LEFT JOIN Contrata c ON c.FkReserva = r.ID
+	LEFT JOIN ServicoAdicional s ON s.ID = c.FkServicoAdicional
+WHERE r.DataCheckIn >= '2024-11-12'
+	GROUP BY h.ID, h.Nome;
 
--- 10. Pessoas que nunca cancelaram reservas
+# 10. Pessoas que nunca cancelaram reservas
 SELECT 
-    Pessoa.PrimeiroNome, 
-    Pessoa.UltimoNome 
+	Pessoa.PrimeiroNome, 
+	Pessoa.UltimoNome 
 FROM Pessoa 
-JOIN Hospede ON Pessoa.ID = Hospede.FkPessoa 
-WHERE Hospede.FkPessoa NOT IN (
-    SELECT FkHospede 
-    FROM Reserva 
-    WHERE Status = "Cancelada"
-);
+	JOIN Hospede ON Pessoa.ID = Hospede.FkPessoa 
+WHERE Hospede.FkPessoa NOT IN (SELECT FkHospede FROM Reserva WHERE Status = "Cancelada");
 
--- 11. Dados de reservas com hóspede e hotel
+# 11. Dados de reservas com hóspede e hotel
 SELECT 
-    Pessoa.PrimeiroNome, 
-    Pessoa.UltimoNome, 
-    Hotel.Nome, 
-    Reserva.DataCheckIn, 
-    Reserva.DataCheckOut 
-FROM Reserva 
-JOIN Hotel ON Hotel.ID = Reserva.FkHotel 
-LEFT JOIN Pessoa ON Reserva.FkHospede = Pessoa.ID;
+	p.PrimeiroNome, 
+	p.UltimoNome, 
+	h.Nome, 
+	r.DataCheckIn, 
+	r.DataCheckOut 
+FROM Reserva r
+	JOIN Hotel h ON h.ID = r.FkHotel 
+	LEFT JOIN Pessoa p ON r.FkHospede = p.ID
 
--- 12. Quantidade de serviços adicionais por hotel
+# 12. Quantidade de serviços adicionais por hotel
 SELECT 
-    Hotel.Nome, 
-    COUNT(ServicoAdicional.ID) 
+	Hotel.Nome, 
+	count(ServicoAdicional.ID) 
 FROM Hotel 
-JOIN Reserva ON Reserva.FkHotel = Hotel.ID 
-LEFT JOIN Contrata ON Contrata.FkReserva = Reserva.ID 
-LEFT JOIN ServicoAdicional ON ServicoAdicional.ID = Contrata.FkServicoAdicional 
-GROUP BY Hotel.ID;
+	JOIN Reserva ON Reserva.FkHotel = Hotel.ID 
+	JOIN Contrata ON Contrata.FkReserva = Reserva.ID 
+	JOIN ServicoAdicional ON ServicoAdicional.ID = Contrata.FkServicoAdicional 
+GROUP BY Hotel.ID
+
+
+
+
+
